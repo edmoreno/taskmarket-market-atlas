@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 15
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url || steps.deployment_final.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - name: Test aggregation
@@ -43,3 +43,17 @@ jobs:
           exit 1
       - uses: actions/deploy-pages@v4
         id: deployment
+        continue-on-error: true
+      - name: Allow Pages metadata to settle after a failed deployment
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 20
+      - uses: actions/deploy-pages@v4
+        id: deployment_retry
+        if: steps.deployment.outcome == 'failure'
+        continue-on-error: true
+      - name: Wait before the final deployment attempt
+        if: steps.deployment_retry.outcome == 'failure'
+        run: sleep 40
+      - uses: actions/deploy-pages@v4
+        id: deployment_final
+        if: steps.deployment_retry.outcome == 'failure'
